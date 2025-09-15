@@ -2,17 +2,17 @@ menu "Baseband Security Guard Configuration"
 
 config SECURITY_BASEBAND_GUARD
        bool "Enable Baseband Guard (Anti-Format)" 
-       default y
+       default n
        depends on SECURITY
        help
           An Android baseband anti-formatting protector 
           module by Github@showdo, preventing malicious
           scripts or programs writing into important
           function partitions.
-          If unsure, leave this y.
+          If unsure, leave this n.
 
 config SECURITY_BASEBAND_GUARD_ALLOW_IN_RECOVERY
-       bool "Turn off Baseband Protect in Recovery Mode"
+       bool "Turn off Baseband Protection in Recovery Mode"
        depends on SECURITY_BASEBAND_GUARD
        default y
        help
