@@ -17,10 +17,21 @@
 
 #define BB_ENFORCING 1
 
-#ifdef CONFIG_SECURITY_BASEBAND_GUARD_DEBUG
+#ifdef CONFIG_BBG_DEBUG
 #define BB_DEBUG 1
 #else
 #define BB_DEBUG 0
+#endif
+
+#if CONFIG_BBG_ANTI_SPOOF_DOMAIN == 1
+#define BB_ANTI_SPOOF_DISABLE_PERMISSIVE 1
+#define BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE 0
+#elif CONFIG_BBG_ANTI_SPOOF_DOMAIN == 2
+#define BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE 1
+#define BB_ANTI_SPOOF_DISABLE_PERMISSIVE 0
+#else
+#define BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE 0
+#define BB_ANTI_SPOOF_DISABLE_PERMISSIVE 0
 #endif
 
 #define bb_pr(fmt, ...)    pr_debug("baseband_guard: " fmt, ##__VA_ARGS__)
@@ -31,7 +42,7 @@
 static const char * const allowed_domain_substrings[] = {
 	"update_engine",
 	"fastbootd",
-#ifdef CONFIG_SECURITY_BASEBAND_GUARD_ALLOW_IN_RECOVERY
+#ifdef CONFIG_BBG_ALLOW_IN_RECOVERY
 	"recovery",
 #endif
 	"rmt_storage",
@@ -48,7 +59,7 @@ static const char * const allowed_domain_substrings[] = {
 static const size_t allowed_domain_substrings_cnt = ARRAY_SIZE(allowed_domain_substrings);
 
 static const char * const allowlist_names[] = {
-#ifndef CONFIG_SECURITY_BASEBAND_GUARD_BLOCK_BOOT
+#ifndef CONFIG_BBG_BLOCK_BOOT
 	"boot", "init_boot",
 #endif
 	"dtbo", "vendor_boot",
@@ -154,7 +165,7 @@ static bool is_zram_device(dev_t dev)
 	struct block_device *bdev;
 	bool is_zram = false;
 
-	bdev = blkdev_get_by_dev(dev, FMODE_READ, THIS_MODULE);
+	bdev = blkdev_get_by_dev_compat(dev, FMODE_READ, THIS_MODULE);
 	if (IS_ERR(bdev))
 		return false;
 
@@ -168,7 +179,7 @@ static bool is_zram_device(dev_t dev)
 		}
 	}
 
-	blkdev_put(bdev, FMODE_READ);
+	blkdev_put_compat(bdev, FMODE_READ, THIS_MODULE);
 	return is_zram;
 }
 
@@ -186,6 +197,10 @@ static bool reverse_allow_match_and_cache(dev_t cur)
 	return false;
 }
 
+#if BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE
+static bool bbg_recently_permissive __read_mostly = false;
+#endif
+
 static bool current_domain_allowed(void)
 {
 #ifdef CONFIG_SECURITY_SELINUX
@@ -194,6 +209,10 @@ static bool current_domain_allowed(void)
 	u32 len = 0;
 	bool ok = false;
 	size_t i;
+
+#if BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE
+	if (unlikely(bbg_recently_permissive)) return false;
+#endif
 
 	security_cred_getsecid_compat(current_cred(), &sid);
 
@@ -374,7 +393,11 @@ static struct security_hook_list bb_hooks[] = {
 
 static int __init bbg_init(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0)
 	security_add_hooks(bb_hooks, ARRAY_SIZE(bb_hooks), "baseband_guard");
+#else
+	security_add_hooks(bb_hooks, ARRAY_SIZE(bb_hooks));
+#endif
 	pr_info("baseband_guard_all power by https://t.me/qdykernel\n");
 	return 0;
 }
@@ -386,6 +409,17 @@ DEFINE_LSM(baseband_guard) = {
 	.name = "baseband_guard",
 	.init = bbg_init,
 };
+#endif
+
+#ifdef CONFIG_SECURITY_SELINUX_DEVELOP
+int bbg_process_setpermissive(void) {
+#if BB_ANTI_SPOOF_NO_TRUST_PERMISSIVE_ONCE
+	if (!bbg_recently_permissive) bbg_recently_permissive = true;
+	return 0;
+#elif BB_ANTI_SPOOF_DISABLE_PERMISSIVE
+	return 1;
+#endif
+}
 #endif
 
 MODULE_DESCRIPTION("protect ALL form TG@qdykernel");
