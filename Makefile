@@ -5,7 +5,7 @@ GIT_BIN := /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin git
 COMMIT_SHA := $(shell cd $(srctree)/$(src) && $(GIT_BIN) rev-parse --short=8 HEAD 2>/dev/null)
 
 ifeq ($(strip $(COMMIT_SHA)),)
-  COMMIT_SHA := unknown
+  COMMIT_SHA := cctv18-fork
 endif
 
 $(info -- BBG was enabled!)
