@@ -38,7 +38,7 @@ config BBG_BLOCK_BOOT
 config BBG_BLOCK_RECOVERY
        bool "Enable Baseband Protection for Recovery Partition"
        depends on BBG
-       default n
+       default y
        help
           Enable protection for recovery partition to
           prevent malicious scripts or programs
